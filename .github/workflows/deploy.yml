@@ -1,0 +1,39 @@
+name: Update and Deploy PeakCut
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours check upstream
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: AndyDope/PeakCut
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/haziqahmedqasmi/PeakCut.git
+          git fetch upstream
+
+      - name: Rebase onto upstream
+        run: |
+          git rebase upstream/main || {
+            echo "Conflicts detected - manual intervention needed"
+            exit 1
+          }
+
+      - name: Push to fork
+        run: git push origin main --force-with-lease
+
+      - name: Deploy to Oracle
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: /opt/peakcut/update.sh
